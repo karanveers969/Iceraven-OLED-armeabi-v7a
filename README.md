@@ -18,10 +18,7 @@ While many Firefox-based browsers exist, Iceraven stands out with its:
 ---
 
 *Note: Requires Android device with armeabi-v7a architecture.*
-✍ Credits
-
-    AMOLED patch idea: ArtikusHG/Ironfox-OLEDDark,GoodyOG/Iceraven-OLED
-
-    Original Iceraven browser: fork-maintainers
-
-    armeabi-v7a fork & automation: karanveers969
+## ✍ Credits
+- AMOLED patch idea: [ArtikusHG/Ironfox-OLEDDark](https://github.com/ArtikusHG/Ironfox-OLEDDark), [GoodyOG/Iceraven-OLED](https://github.com/GoodyOG/Iceraven-OLED)
+- Original Iceraven browser: [fork-maintainers](https://github.com/fork-maintainers/iceraven-browser)
+- armeabi-v7a fork & automation: [karanveers969](https://github.com/karanveers969)
