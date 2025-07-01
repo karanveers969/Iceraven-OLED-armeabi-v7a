@@ -8,23 +8,47 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y wget jq zipalign apksigner default-jdk
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y wget jq zipalign apksigner default-jdk
 
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Get latest upstream release info
+      id: get_latest
+      run: |
+        data=$(curl -s https://api.github.com/repos/GoodyOG/Iceraven-OLED/releases/latest)
+        echo "UPSTREAM_TAG=$(echo "$data" | jq -r .tag_name)" >> $GITHUB_ENV
+        echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+        echo "$data" | jq -r .body >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
 
-      - name: Run build script
-        run: |
-          chmod +x ./build.sh
-          ./build.sh
+    - name: Check if already built
+      uses: cardinalby/git-get-release-action@v1
+      id: get_current
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        latest: true
 
-      - name: Publish release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: nightly-${{ github.run_number }}
-          files: iceraven-patched-signed.apk
-          body: "Automated build of latest Iceraven with OLED patch"
+    - name: Skip if tag already built
+      if: ${{ steps.get_current.outputs.tag_name == env.UPSTREAM_TAG }}
+      run: |
+        echo "Latest tag already built: ${{ env.UPSTREAM_TAG }}"
+        exit 0
+
+    - name: Checkout this repo
+      uses: actions/checkout@v3
+
+    - name: Run build script
+      run: |
+        chmod +x ./build.sh
+        ./build.sh
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.UPSTREAM_TAG }}
+        body: ${{ env.RELEASE_BODY }}
+        files: iceraven-patched-signed.apk
