@@ -1,4 +1,4 @@
-name: Build Iceraven OLED
+name: build apk
 
 on:
   workflow_dispatch:
@@ -8,47 +8,50 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y wget jq zipalign apksigner default-jdk
+      - name: Check if already built (allow first run)
+        uses: cardinalby/git-get-release-action@v1
+        id: get_current
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          latest: true
+        continue-on-error: true
 
-    - name: Get latest upstream release info
-      id: get_latest
-      run: |
-        data=$(curl -s https://api.github.com/repos/GoodyOG/Iceraven-OLED/releases/latest)
-        echo "UPSTREAM_TAG=$(echo "$data" | jq -r .tag_name)" >> $GITHUB_ENV
-        echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
-        echo "$data" | jq -r .body >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y wget jq apktool zipalign apksigner
 
-    - name: Check if already built
-      uses: cardinalby/git-get-release-action@v1
-      id: get_current
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        latest: true
+      - name: Get latest Iceraven release version
+        run: |
+          echo "BUILD_VERSION=$(curl -s https://api.github.com/repos/fork-maintainers/iceraven-browser/releases/latest | jq -r .tag_name)" >> $GITHUB_ENV
 
-    - name: Skip if tag already built
-      if: ${{ steps.get_current.outputs.tag_name == env.UPSTREAM_TAG }}
-      run: |
-        echo "Latest tag already built: ${{ env.UPSTREAM_TAG }}"
-        exit 0
+      - name: Check if latest version was already built
+        if: ${{ steps.get_current.outputs.tag_name == env.BUILD_VERSION }}
+        run: |
+          echo "Latest version already built and released"
+          exit -1
 
-    - name: Checkout this repo
-      uses: actions/checkout@v3
+      - name: Check out repository code
+        uses: actions/checkout@v3
 
-    - name: Run build script
-      run: |
-        chmod +x ./build.sh
-        ./build.sh
+      - name: Run build script and sign apk
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
+          echo "${{ secrets.KEYSTORE }}" | base64 -di > keystore.jks
+          apksigner sign --ks keystore.jks --ks-pass pass:${{ secrets.KEYSTORE_PASSPHRASE }} iceraven-patched-signed.apk
 
-    - name: Publish release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ env.UPSTREAM_TAG }}
-        body: ${{ env.RELEASE_BODY }}
-        files: iceraven-patched-signed.apk
+      - name: Get release notes from upstream
+        run: |
+          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_ENV
+          curl -s https://api.github.com/repos/fork-maintainers/iceraven-browser/releases/tags/$BUILD_VERSION | jq -r .body >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.BUILD_VERSION }}
+          files: iceraven-patched-signed.apk
+          body: ${{ env.RELEASE_NOTES }}
